@@ -185,120 +185,226 @@ io.on("connection", (socket) => {
     socket.reactFlyTs = ts;
     console.log(socket.nodeFlyTs, socket.reactFlyTs);
   });
-  socket.on("flappyDied", async (ts, score, jumps, flyArea) => {
-    console.log("died");
-    //hard code same pipe data
-    const pipeQueue = [
-      {
-        topHeight: 189,
-        bottomHeight: 141,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-      {
-        topHeight: 167,
-        bottomHeight: 163,
-      },
-    ];
+  socket.on(
+    "flappyDied",
+    async (ts, score, jumps, flyArea, startTime, endTime, pipeData) => {
+      console.log("died", jumps, pipeData);
+      //hard code same pipe data
+      const pipeQueue = [
+        {
+          topHeight: 189,
+          bottomHeight: 141,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+        {
+          topHeight: 167,
+          bottomHeight: 163,
+        },
+      ];
 
-    //======SIMULATE CHECK HERE ++++++++++
+      //======SIMULATE CHECK HERE ++++++++++
 
-    // const result = simulateGame(jumps, pipeQueue, flyArea);
-    // console.log("== Final Result ==");
-    // console.log(result);
-  });
+      try {
+        const verifier = new GameVerifier(pipeData);
+        const result = verifier.simulateGame(jumps);
+
+        console.log(verifier, result, "resver");
+
+        if (result.verified && result.simulatedScore === score) {
+          console.log("Game verified successfully");
+        } else {
+          console.warn("Game verify failed");
+        }
+      } catch (err) {
+        console.error("Error verifying flappy game:", err);
+      }
+
+      // const result = simulateGame(jumps, pipeQueue, flyArea);
+      // console.log("== Final Result ==");
+      // console.log(result);
+    }
+  );
 
   socket.on("disconnect", () => {
     console.log("Disc socket id:", socket.id);
     // handleDisconnect(socket);
   });
 });
+
+class GameVerifier {
+  constructor(pipeData) {
+    // Initialize with same constants as the game
+    this.gravity = 0.25;
+    this.jump = -4.6;
+    this.position = 180;
+    this.velocity = 0;
+    this.score = 0;
+    this.gameOver = false;
+
+    // Store the pipe data sent from the client
+    this.pipes = pipeData;
+    this.passedPipes = [];
+  }
+
+  simulateGame(jumpTimestamps) {
+    const frameTime = 1000 / 60; // 60 FPS
+    let currentTime = 0;
+    let currentFrame = 0;
+    let nextJumpIndex = 0;
+
+    while (!this.gameOver && currentFrame < 10000) {
+      // Safety limit
+      // Check if player jumped at this time
+      if (
+        nextJumpIndex < jumpTimestamps.length &&
+        jumpTimestamps[nextJumpIndex] <= currentTime
+      ) {
+        this.velocity = this.jump;
+        nextJumpIndex++;
+      }
+
+      // Apply physics
+      this.velocity += this.gravity;
+      this.position += this.velocity;
+
+      // Check collisions with pipes
+      this.checkCollisions(currentTime);
+
+      // Check if bird hit the ground or ceiling
+      if (this.position >= 370 || this.position <= 0) {
+        this.gameOver = true;
+      }
+
+      // Move to next frame
+      currentTime += frameTime;
+      currentFrame++;
+    }
+
+    return {
+      verified: !this.gameOver, // Game was valid if it didn't end prematurely
+      simulatedScore: this.score,
+      frames: currentFrame,
+    };
+  }
+
+  checkCollisions(currentTime) {
+    // Check each pipe that would be active at this time
+    this.pipes.forEach((pipe) => {
+      if (pipe.time <= currentTime && !this.passedPipes.includes(pipe.id)) {
+        // Calculate pipe position based on time elapsed
+        const pipePosition = 288 - ((currentTime - pipe.time) / 1000) * 134;
+
+        if (pipePosition < 0) {
+          // Pipe has passed entirely
+          if (!this.passedPipes.includes(pipe.id)) {
+            this.passedPipes.push(pipe.id);
+            this.score++;
+          }
+        } else if (pipePosition < 55) {
+          // Check collision
+          const birdRight = 65; // Position + width of bird
+          const birdTop = this.position;
+          const birdBottom = this.position + 30; // Height of bird
+
+          if (
+            birdRight > pipePosition &&
+            birdRight < pipePosition + 52 &&
+            (birdTop < pipe.topHeight || birdBottom > pipe.topHeight + 90)
+          ) {
+            this.gameOver = true;
+          }
+        }
+      }
+    });
+  }
+}
 
 httpServer.listen(4000, () => {
   console.log(`Listening at port 4000`);

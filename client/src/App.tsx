@@ -9,7 +9,10 @@ interface ClientToServerEvents {
     ts: number,
     score: number,
     jumps: number[],
-    flyArea: any
+    endTime: number,
+    startTime: number,
+    flyArea: any,
+    pipeData: any
   ) => void;
   revalidate: (ts: number, score: number, vallidator: number) => void;
 }
@@ -102,14 +105,24 @@ function App() {
       }
 
       if (event.data?.type === "dead") {
-        const { score, jumps, flyArea } = event.data;
+        const { score, jumps, flyArea, startTime, endTime, pipeData } =
+          event.data;
         console.log(score, "dead score");
         const ts = Date.now();
         const flappyDied = () => {
           const socket = socketRef.current;
           console.log("flap 1", jumps);
           if (socket) {
-            socket.emit("flappyDied", ts, score, jumps, flyArea);
+            socket.emit(
+              "flappyDied",
+              ts,
+              score,
+              jumps,
+              flyArea,
+              startTime,
+              endTime,
+              pipeData
+            );
             console.log("flappy fly");
           }
         };

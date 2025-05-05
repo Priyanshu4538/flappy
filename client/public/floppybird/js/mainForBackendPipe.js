@@ -1,3 +1,4 @@
+//======debug tru or false here ============
 var debugmode = false;
 
 var states = Object.freeze({
@@ -16,20 +17,24 @@ var jump = -4.6;
 var flyArea = $("#flyarea").height();
 
 var score = 0;
-var highscore = 0;
 var previousScore = 0;
+var highscore = 0;
 
 var pipeheight = 90;
 var pipewidth = 52;
 var pipes = new Array();
 
 var replayclickable = false;
+var pipeQueue = [];
 
-let pipeData = [];
 let jumps = [];
 
+let pipeData = [];
 let jumpData = [];
 let gameStartTime;
+
+// sending fly area to parent
+window.parent.postMessage({ type: "flyarea", flyArea }, "*");
 
 //sounds
 var volume = 30;
@@ -39,8 +44,6 @@ var soundHit = new buzz.sound("assets/sounds/sfx_hit.ogg");
 var soundDie = new buzz.sound("assets/sounds/sfx_die.ogg");
 var soundSwoosh = new buzz.sound("assets/sounds/sfx_swooshing.ogg");
 buzz.all().setVolume(volume);
-
-window.parent.postMessage({ type: "flyarea", flyArea }, "*");
 
 //loops
 var loopGameloop;
@@ -124,6 +127,8 @@ function startGame() {
   loopGameloop = setInterval(gameloop, updaterate);
   loopPipeloop = setInterval(updatePipes, 1400);
 
+  // gameStartTime = performance.now();
+
   gameStartTime = Date.now();
 
   //start game to react parent
@@ -141,6 +146,7 @@ function updatePlayer(player) {
   rotation = Math.min((velocity / 10) * 90, 90);
 
   //apply rotation and position
+
   $(player).css({ rotate: rotation, top: position });
 }
 
@@ -153,6 +159,7 @@ function gameloop() {
 
   //update the player
   updatePlayer(player);
+
   if (score !== previousScore) {
     console.log(previousScore, " score changed to new score of ", score);
     previousScore = score; // Update the previous score
@@ -254,12 +261,39 @@ function screenClick() {
   }
 }
 
+// function playerJump() {
+//   velocity = jump;
+//   //play jump sound
+//   soundJump.stop();
+//   soundJump.play();
+// }
+
+//updated jump function that records relative timestamps
+// function playerJump() {
+//   velocity = jump;
+
+//   if (gameStartTime !== null) {
+//     const now = performance.now();
+//     jumps.push({ t: Math.round(now - gameStartTime) });
+//   }
+
+//   // play jump sound
+//   soundJump.stop();
+//   soundJump.play();
+// }
+
 function playerJump() {
   jumpData.push(Date.now() - gameStartTime);
+
+  // Original jump code
   velocity = jump;
-  //play jump sound
   soundJump.stop();
   soundJump.play();
+}
+
+function sendScoreToParent(score) {
+  //  message to the parent with the new score ofc
+  window.parent.postMessage({ type: "score", score: score }, "*");
 }
 
 function setBigScore(erase) {
@@ -330,24 +364,7 @@ function setMedal() {
   return true;
 }
 
-function sendScoreToParent(score) {
-  //  message to the parent with the new score ofc
-  window.parent.postMessage({ type: "score", score: score }, "*");
-}
-
 function playerDead() {
-  window.parent.postMessage(
-    {
-      type: "dead",
-      startTime: gameStartTime,
-      endTime: Date.now(),
-      score: score,
-      jumps: jumpData,
-      flyArea: flyArea,
-      pipeData: pipeData,
-    },
-    "*"
-  );
   //stop animating everything!
   $(".animated").css("animation-play-state", "paused");
   $(".animated").css("-webkit-animation-play-state", "paused");
@@ -383,6 +400,20 @@ function playerDead() {
       });
     });
   }
+
+  //dead event to parent
+  window.parent.postMessage(
+    {
+      type: "dead",
+      startTime: gameStartTime,
+      endTime: Date.now(),
+      score: score,
+      jumps: jumpData,
+      flyArea: flyArea,
+      pipeData: pipeData,
+    },
+    "*"
+  );
 }
 
 function showScore() {
@@ -451,9 +482,10 @@ $("#replay").click(function () {
       //when that's done, display us back to nothing
       $("#scoreboard").css("display", "none");
 
-      //start the game over!
+      // +==== restarting by refreshing react component instead of inbuilt func =+
       window.parent.postMessage({ type: "restart" }, "*");
 
+      //start the game over!
       // showSplash();
     }
   );
@@ -467,17 +499,52 @@ function playerScore() {
   setBigScore();
 }
 
+// ++ NEW update pipe func for our backend sent pipes
+
+// function updatePipes() {
+//   // Remove off-screen pipes
+//   $(".pipe")
+//     .filter(function () {
+//       return $(this).position().left <= -100;
+//     })
+//     .remove();
+
+//   // If pipeQueue is running low, request more from React/WebSocket via parent
+//   if (pipeQueue.length < 3) {
+//     window.parent.postMessage({ type: "requestPipes" }, "*");
+//   }
+
+//   // Use next pipe from the queue, if available
+//   if (pipeQueue.length > 0) {
+//     const { topHeight, bottomHeight } = pipeQueue.shift();
+
+//     const newpipe = $(`
+//       <div class="pipe animated">
+//         <div class="pipe_upper" style="height: ${topHeight}px;"></div>
+//         <div class="pipe_lower" style="height: ${bottomHeight}px;"></div>
+//       </div>
+//     `);
+//     $("#flyarea").append(newpipe);
+//     pipes.push(newpipe);
+//   }
+// }
+
+// ++ DIsabled old update pipe func
+
 function updatePipes() {
   var padding = 80;
   var constraint = flyArea - pipeheight - padding * 2;
   var topheight = Math.floor(Math.random() * constraint + padding);
   var bottomheight = flyArea - pipeheight - topheight;
+
+  // Record pipe data
   pipeData.push({
     id: pipeData.length,
     time: Date.now() - gameStartTime,
     topHeight: topheight,
     bottomHeight: bottomheight,
   });
+
   //Do any pipes need removal?
   $(".pipe")
     .filter(function () {
@@ -534,3 +601,11 @@ var isIncompatible = {
     );
   },
 };
+
+// event listeener to add pipes from parent
+// window.addEventListener("message", (event) => {
+//   if (event.data.type === "pipes") {
+//     pipeQueue.push(...event.data.pipes);
+//     console.log("Received and added to pipeQueue:", pipeQueue);
+//   }
+// });
